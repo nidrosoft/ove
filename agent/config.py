@@ -36,7 +36,12 @@ class Config:
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
     FROM_EMAIL = os.getenv("FROM_EMAIL", "receptionist@omnira.space")
 
+    # Omnira Platform API
+    OMNIRA_API_URL = os.getenv("OMNIRA_API_URL", "https://omniradental-cyri.vercel.app/api")
+    OMNIRA_API_KEY = os.getenv("OMNIRA_API_KEY", "")
+
     # Practice
+    PRACTICE_ID = os.getenv("PRACTICE_ID", "")
     PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Demo Dental")
     PRACTICE_PHONE = os.getenv("PRACTICE_PHONE", "")
     PRACTICE_TIMEZONE = os.getenv("PRACTICE_TIMEZONE", "America/Los_Angeles")

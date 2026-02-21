@@ -2,13 +2,19 @@
 import logging
 import uuid
 
-from livekit.agents import Agent, AgentSession, RoomInputOptions
-from livekit.agents.voice import MetricsCollectedEvent
+from livekit.agents import Agent, AgentSession
 from livekit.plugins import deepgram, silero, anthropic
 
 from agent.config import Config
 from agent.prompts import build_system_prompt
-from agent.tools import check_availability, book_appointment, send_sms, send_email, transfer_call
+from agent.tools import (
+    check_availability,
+    book_appointment,
+    send_sms,
+    send_email,
+    transfer_call,
+    lookup_patient,
+)
 from agent.logger import CallLogger
 
 logger = logging.getLogger("omnira-agent")
@@ -17,11 +23,11 @@ logger = logging.getLogger("omnira-agent")
 class OmniraReceptionist(Agent):
     """The Omnira dental receptionist voice agent."""
 
-    def __init__(self):
+    def __init__(self, call_logger: CallLogger):
         super().__init__(
             instructions=build_system_prompt(),
         )
-        self.call_logger = CallLogger(call_id=str(uuid.uuid4()))
+        self.call_logger = call_logger
         logger.info(f"New agent created for call {self.call_logger.call_id}")
 
     async def on_enter(self):
@@ -50,6 +56,7 @@ def create_agent_session() -> AgentSession:
             model="aura-2-thalia-en",
         ),
         tools=[
+            lookup_patient,
             check_availability,
             book_appointment,
             send_sms,

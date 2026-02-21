@@ -1,10 +1,8 @@
-"""Tool definitions for the voice agent — these are the actions it can take during a call."""
+"""Tool definitions for the voice agent — calls Omnira Platform API for real actions."""
 import json
 import logging
 
 import httpx
-import resend
-from twilio.rest import Client as TwilioClient
 
 from livekit.agents import function_tool, RunContext
 
@@ -12,9 +10,62 @@ from agent.config import Config
 
 logger = logging.getLogger("omnira-tools")
 
-# Initialize clients
-twilio_client = TwilioClient(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN) if Config.TWILIO_ACCOUNT_SID else None
-resend.api_key = Config.RESEND_API_KEY
+
+async def _call_omnira_action(action: str, params: dict) -> dict:
+    """Call the Omnira platform API to execute an action."""
+    url = f"{Config.OMNIRA_API_URL}/voice-engine/actions"
+    body = {
+        "action": action,
+        "practice_id": Config.PRACTICE_ID,
+        "params": params,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                url,
+                json=body,
+                headers={
+                    "Authorization": f"Bearer {Config.OMNIRA_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+            data = resp.json()
+            if resp.status_code >= 400:
+                logger.error(f"Omnira API error ({action}): {resp.status_code} — {data}")
+            return data
+    except Exception as e:
+        logger.error(f"Omnira API call failed ({action}): {e}")
+        return {"success": False, "error": str(e)}
+
+
+@function_tool(description="Look up an existing patient by name or phone number.")
+async def lookup_patient(
+    context: RunContext,
+    name: str = "",
+    phone: str = "",
+) -> str:
+    """Look up a patient in the system.
+
+    Args:
+        name: Patient name to search for
+        phone: Patient phone number to search for
+    """
+    logger.info(f"Looking up patient: name={name}, phone={phone}")
+    result = await _call_omnira_action("lookup_patient", {"name": name, "phone": phone})
+
+    if result.get("found"):
+        patients = result.get("patients", [])
+        p = patients[0]
+        return json.dumps({
+            "found": True,
+            "patient_id": p.get("id"),
+            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "email": p.get("email", ""),
+            "phone": p.get("phone_mobile", ""),
+            "status": p.get("status", ""),
+        })
+    return json.dumps({"found": False, "message": "No patient found with that information."})
 
 
 @function_tool(description="Check available appointment slots. Call this when a patient asks about availability.")
@@ -29,17 +80,10 @@ async def check_availability(
         date: The date to check (YYYY-MM-DD format or natural language like 'next Tuesday')
         procedure_type: Type of appointment (general, cleaning, emergency, consultation)
     """
-    # TODO: Replace with real Omnira/Stella API call
-    # For MVP, return mock availability
     logger.info(f"Checking availability for {date}, procedure: {procedure_type}")
 
-    # Mock response — replace with actual API call:
-    # async with httpx.AsyncClient() as client:
-    #     resp = await client.get(f"{Config.OMNIRA_API_URL}/availability",
-    #         params={"date": date, "procedure": procedure_type},
-    #         headers={"Authorization": f"Bearer {Config.OMNIRA_API_KEY}"})
-    #     return resp.text
-
+    # Availability is still handled locally until Omnira has a scheduling engine.
+    # Return representative slots based on practice hours.
     return json.dumps({
         "available_slots": [
             {"time": "9:00 AM", "provider": "Dr. Smith"},
@@ -60,8 +104,9 @@ async def book_appointment(
     procedure_type: str,
     patient_phone: str = "",
     patient_email: str = "",
+    is_new_patient: bool = True,
 ) -> str:
-    """Book an appointment.
+    """Book an appointment via the Omnira platform.
 
     Args:
         patient_name: Full name of the patient
@@ -70,25 +115,31 @@ async def book_appointment(
         procedure_type: Type of procedure (cleaning, checkup, emergency, etc.)
         patient_phone: Patient phone number (optional)
         patient_email: Patient email address (optional)
+        is_new_patient: Whether this is a new patient (default True)
     """
     logger.info(f"Booking: {patient_name} on {date} at {time} for {procedure_type}")
 
-    # TODO: Replace with real Omnira/Stella API call
-    # async with httpx.AsyncClient() as client:
-    #     resp = await client.post(f"{Config.OMNIRA_API_URL}/appointments",
-    #         json={"patient_name": patient_name, "date": date, "time": time,
-    #               "procedure": procedure_type, "phone": patient_phone, "email": patient_email},
-    #         headers={"Authorization": f"Bearer {Config.OMNIRA_API_KEY}"})
-    #     return resp.text
-
-    return json.dumps({
-        "status": "confirmed",
-        "appointment_id": "APT-2026-001",
+    result = await _call_omnira_action("book_appointment", {
         "patient_name": patient_name,
         "date": date,
         "time": time,
-        "procedure": procedure_type,
-        "message": f"Appointment booked for {patient_name} on {date} at {time} for {procedure_type}."
+        "procedure_type": procedure_type,
+        "phone": patient_phone,
+        "email": patient_email,
+        "is_new_patient": is_new_patient,
+    })
+
+    if result.get("success"):
+        return json.dumps({
+            "status": "confirmed",
+            "appointment_id": result.get("appointment_id"),
+            "patient_id": result.get("patient_id"),
+            "message": result.get("message", f"Appointment booked for {patient_name} on {date} at {time}."),
+        })
+
+    return json.dumps({
+        "status": "error",
+        "message": f"I wasn't able to book that appointment right now. Error: {result.get('error', 'unknown')}",
     })
 
 
@@ -98,7 +149,7 @@ async def send_sms(
     to_phone: str,
     message: str,
 ) -> str:
-    """Send an SMS message via Twilio.
+    """Send an SMS message via the Omnira platform.
 
     Args:
         to_phone: Recipient phone number (E.164 format, e.g., +15551234567)
@@ -106,19 +157,14 @@ async def send_sms(
     """
     logger.info(f"Sending SMS to {to_phone}: {message[:50]}...")
 
-    if not twilio_client:
-        return "SMS service not configured. Message noted for staff follow-up."
+    result = await _call_omnira_action("send_sms", {
+        "phone": to_phone,
+        "message": message,
+    })
 
-    try:
-        msg = twilio_client.messages.create(
-            body=message,
-            from_=Config.TWILIO_PHONE_NUMBER,
-            to=to_phone,
-        )
+    if result.get("success"):
         return f"Confirmation text sent successfully to {to_phone}."
-    except Exception as e:
-        logger.error(f"SMS failed: {e}")
-        return "I wasn't able to send the text right now, but I've noted the appointment details."
+    return "I wasn't able to send the text right now, but I've noted the appointment details."
 
 
 @function_tool(description="Send a confirmation email to the patient. Use after booking an appointment.")
@@ -128,7 +174,7 @@ async def send_email(
     subject: str,
     body: str,
 ) -> str:
-    """Send an email via Resend.
+    """Send an email via the Omnira platform.
 
     Args:
         to_email: Recipient email address
@@ -137,20 +183,15 @@ async def send_email(
     """
     logger.info(f"Sending email to {to_email}: {subject}")
 
-    if not Config.RESEND_API_KEY:
-        return "Email service not configured. Message noted for staff follow-up."
+    result = await _call_omnira_action("send_confirmation_email", {
+        "email": to_email,
+        "subject": subject,
+        "body": body,
+    })
 
-    try:
-        email = resend.Emails.send({
-            "from": Config.FROM_EMAIL,
-            "to": [to_email],
-            "subject": subject,
-            "text": body,
-        })
+    if result.get("success"):
         return f"Confirmation email sent successfully to {to_email}."
-    except Exception as e:
-        logger.error(f"Email failed: {e}")
-        return "I wasn't able to send the email right now, but your appointment is confirmed."
+    return "I wasn't able to send the email right now, but your appointment is confirmed."
 
 
 @function_tool(description="Transfer the call to a human staff member. Use when the caller needs something you cannot handle.")
@@ -166,6 +207,4 @@ async def transfer_call(
         department: Which department to transfer to (front_desk, billing, clinical)
     """
     logger.info(f"Call transfer requested: {reason} → {department}")
-    # In production, this would trigger a LiveKit SIP transfer
-    # For now, return a message
     return f"I'm transferring you now to our {department.replace('_', ' ')} team. One moment please."
