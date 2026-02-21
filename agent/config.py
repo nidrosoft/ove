@@ -42,8 +42,11 @@ class Config:
 
     # Practice
     PRACTICE_ID = os.getenv("PRACTICE_ID", "")
-    PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Demo Dental")
-    PRACTICE_PHONE = os.getenv("PRACTICE_PHONE", "")
-    PRACTICE_TIMEZONE = os.getenv("PRACTICE_TIMEZONE", "America/Los_Angeles")
-    PRACTICE_HOURS = os.getenv("PRACTICE_HOURS", "Mon-Fri 8am-5pm")
-    PRACTICE_ADDRESS = os.getenv("PRACTICE_ADDRESS", "")
+    PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Rivera Dental Care")
+    PRACTICE_PHONE = os.getenv("PRACTICE_PHONE", "(555) 867-5309")
+    PRACTICE_TIMEZONE = os.getenv("PRACTICE_TIMEZONE", "America/Chicago")
+    PRACTICE_HOURS = os.getenv("PRACTICE_HOURS", "Mon-Fri 8am-5pm, Sat 9am-1pm")
+    PRACTICE_ADDRESS = os.getenv("PRACTICE_ADDRESS", "742 Evergreen Terrace, Austin, TX 78701")
+
+    # Agent
+    AGENT_NAME = os.getenv("AGENT_NAME", "Relay")

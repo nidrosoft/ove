@@ -18,6 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("omnira")
 
+from agent.config import Config
+logger.info(f"Practice: {Config.PRACTICE_NAME} | Agent: {Config.AGENT_NAME}")
+
 
 async def entrypoint(ctx):
     """Handle a new call/room connection."""

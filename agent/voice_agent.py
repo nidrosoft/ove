@@ -34,7 +34,7 @@ class OmniraReceptionist(Agent):
         """Called when the agent joins. Start with a greeting."""
         self.session.generate_reply(
             instructions="Greet the caller warmly. Say: Thank you for calling "
-            f"{Config.PRACTICE_NAME}, this is Nira, how can I help you today?"
+            f"{Config.PRACTICE_NAME}, this is {Config.AGENT_NAME}, how can I help you today?"
         )
 
 
