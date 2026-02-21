@@ -5,7 +5,7 @@ import uuid
 
 from dotenv import load_dotenv
 from livekit import rtc
-from livekit.agents import WorkerOptions, cli
+from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent
 
 from agent.voice_agent import OmniraReceptionist, create_agent_session
 from agent.logger import CallLogger
@@ -37,6 +37,18 @@ async def entrypoint(ctx):
     logger.info(f"Call {call_id}: from={from_number} to={to_number}")
 
     session = create_agent_session()
+
+    @session.on("conversation_item_added")
+    def on_conversation_item_added(event: ConversationItemAddedEvent):
+        text = event.item.text_content
+        if not text or not text.strip():
+            return
+        role = event.item.role
+        if role == "user":
+            call_logger.log_caller_speech(text)
+        elif role == "assistant":
+            call_logger.log_agent_speech(text)
+
     agent = OmniraReceptionist(call_logger=call_logger)
 
     await session.start(
