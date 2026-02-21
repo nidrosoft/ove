@@ -86,16 +86,22 @@ async def check_availability(
     """
     logger.info(f"Checking availability for {date}, procedure: {procedure_type}")
 
-    # Availability is still handled locally until Omnira has a scheduling engine.
-    # Return representative slots based on practice hours.
-    return json.dumps({
-        "available_slots": [
-            {"time": "9:00 AM", "provider": "Dr. Smith"},
-            {"time": "10:30 AM", "provider": "Dr. Smith"},
-            {"time": "2:00 PM", "provider": "Dr. Johnson"},
-            {"time": "3:30 PM", "provider": "Dr. Johnson"},
-        ],
+    result = await _call_omnira_action("check_availability", {
         "date": date,
+        "procedure_type": procedure_type,
+    })
+
+    if result.get("success"):
+        return json.dumps({
+            "available_slots": result.get("available_slots", []),
+            "date": result.get("date", date),
+            "total_available": result.get("total_available", 0),
+        })
+
+    return json.dumps({
+        "available_slots": [],
+        "date": date,
+        "message": "Unable to check availability right now. Please ask the patient for their preferred time and we'll confirm.",
     })
 
 
