@@ -13,10 +13,11 @@ logger = logging.getLogger("call-logger")
 class CallLogger:
     """Logs call transcripts and events, sends post-call data to Omnira."""
 
-    def __init__(self, call_id: str, from_number: str = "", to_number: str = ""):
+    def __init__(self, call_id: str, from_number: str = "", to_number: str = "", practice_id: str = ""):
         self.call_id = call_id
         self.from_number = from_number
         self.to_number = to_number
+        self.practice_id = practice_id
         self.started_at = datetime.now(timezone.utc).isoformat()
         self.events: list[dict] = []
         self.collected_info: dict = {}
@@ -75,6 +76,7 @@ class CallLogger:
 
         return {
             "source": "omnira-voice-engine",
+            "practice_id": self.practice_id,
             "call_id": self.call_id,
             "from": self.from_number,
             "to": self.to_number,
