@@ -1,11 +1,12 @@
 """Entry point — LiveKit Agent worker."""
 import asyncio
+import json
 import logging
 import uuid
 
 from dotenv import load_dotenv
 from livekit import rtc
-from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent
+from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent, FunctionToolsExecutedEvent
 
 from agent.voice_agent import OmniraReceptionist, create_agent_session
 from agent.logger import CallLogger
@@ -51,6 +52,18 @@ async def entrypoint(ctx):
             call_logger.log_caller_speech(text)
         elif role == "assistant":
             call_logger.log_agent_speech(text)
+
+    @session.on("function_tools_executed")
+    def on_function_tools_executed(event: FunctionToolsExecutedEvent):
+        for fnc_call, fnc_output in event.zipped():
+            tool_name = fnc_call.name
+            try:
+                args = fnc_call.arguments if isinstance(fnc_call.arguments, dict) else json.loads(fnc_call.raw_arguments or "{}")
+            except Exception:
+                args = {}
+            result_str = str(fnc_output.output or fnc_output.content or "")[:500]
+            call_logger.log_tool_call(tool_name, args, result_str)
+            logger.info(f"[{call_id}] Tool executed: {tool_name}({json.dumps(args)[:100]}) → {result_str[:100]}")
 
     agent = OmniraReceptionist(call_logger=call_logger)
 

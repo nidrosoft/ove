@@ -12,7 +12,6 @@ from agent.tools import (
     book_appointment,
     send_sms,
     send_email,
-    transfer_call,
     lookup_patient,
 )
 from agent.logger import CallLogger
@@ -61,7 +60,6 @@ def create_agent_session() -> AgentSession:
             book_appointment,
             send_sms,
             send_email,
-            transfer_call,
         ],
     )
 

@@ -64,7 +64,7 @@ class CallLogger:
             if ev["type"] == "caller_speech":
                 lines.append(f"Caller: {ev['text']}")
             elif ev["type"] == "agent_speech":
-                lines.append(f"Nira: {ev['text']}")
+                lines.append(f"Agent: {ev['text']}")
             elif ev["type"] == "tool_call":
                 lines.append(f"[Tool: {ev['tool']}]")
         return "\n".join(lines)
