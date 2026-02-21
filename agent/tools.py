@@ -21,7 +21,7 @@ async def _call_omnira_action(action: str, params: dict) -> dict:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.post(
                 url,
                 json=body,
@@ -30,7 +30,11 @@ async def _call_omnira_action(action: str, params: dict) -> dict:
                     "Content-Type": "application/json",
                 },
             )
-            data = resp.json()
+            if resp.headers.get("content-type", "").startswith("application/json"):
+                data = resp.json()
+            else:
+                logger.error(f"Omnira API non-JSON response ({action}): status={resp.status_code} body={resp.text[:200]}")
+                return {"success": False, "error": f"Non-JSON response (status {resp.status_code})"}
             if resp.status_code >= 400:
                 logger.error(f"Omnira API error ({action}): {resp.status_code} — {data}")
             return data
