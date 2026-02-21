@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  # LiveKit server (local dev)
+  livekit-server:
+    image: livekit/livekit-server:latest
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7880:7880"   # HTTP/WebSocket
+      - "7881:7881"   # RTC (WebRTC)
+      - "7882:7882"   # TURN/TCP
+    environment:
+      - "LIVEKIT_KEYS=devkey: secret"
+
+  # Kokoro TTS (self-hosted)
+  kokoro-tts:
+    image: ghcr.io/eduardolat/kokoro-web:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - KW_SECRET_API_KEY=kokoro-local-key
+    volumes:
+      - kokoro-cache:/kokoro/cache
+    # Note: CPU inference is slower. For GPU, use NVIDIA runtime:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Omnira Voice Agent
+  omnira-agent:
+    build: .
+    depends_on:
+      - livekit-server
+      - kokoro-tts
+    env_file:
+      - .env
+    environment:
+      - LIVEKIT_URL=ws://livekit-server:7880
+      - KOKORO_BASE_URL=http://kokoro-tts:3000
+
+volumes:
+  kokoro-cache:
