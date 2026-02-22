@@ -39,7 +39,7 @@ VOICE_OPTIONS = {
     },
 }
 
-DEFAULT_VOICE = ("deepgram", "thalia")
+DEFAULT_VOICE = ("elevenlabs", "liz")
 
 
 class OmniraReceptionist(Agent):
@@ -69,7 +69,7 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
         from livekit.plugins import elevenlabs
         resolved_voice_id = voice_id
         if not resolved_voice_id:
-            resolved_voice_id = VOICE_OPTIONS["elevenlabs"]["abigail"]["voice_id"]
+            resolved_voice_id = VOICE_OPTIONS["elevenlabs"]["liz"]["voice_id"]
         tts = elevenlabs.TTS(
             api_key=Config.ELEVENLABS_API_KEY,
             voice_id=resolved_voice_id,
