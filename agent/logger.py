@@ -22,6 +22,7 @@ class CallLogger:
         self.events: list[dict] = []
         self.collected_info: dict = {}
         self.tool_results: list[dict] = []
+        self.recording_url: str = ""
 
     def log_event(self, event_type: str, data: dict):
         entry = {
@@ -55,6 +56,9 @@ class CallLogger:
     def set_collected_info(self, key: str, value: str):
         self.collected_info[key] = value
 
+    def set_recording_url(self, url: str):
+        self.recording_url = url
+
     def log_call_end(self, reason: str = "completed"):
         self.log_event("call_end", {"reason": reason})
 
@@ -74,7 +78,7 @@ class CallLogger:
         """Build the payload to send to Omnira's webhook."""
         ended_at = datetime.now(timezone.utc).isoformat()
 
-        return {
+        payload = {
             "source": "omnira-voice-engine",
             "practice_id": self.practice_id,
             "call_id": self.call_id,
@@ -88,6 +92,9 @@ class CallLogger:
             "tool_calls": self.tool_results,
             "events": self.events,
         }
+        if self.recording_url:
+            payload["recording_url"] = self.recording_url
+        return payload
 
     async def send_to_omnira(self):
         """Send the completed call data to the Omnira platform webhook."""

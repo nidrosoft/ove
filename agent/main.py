@@ -2,10 +2,11 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 
 from dotenv import load_dotenv
-from livekit import rtc
+from livekit import rtc, api
 from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent, FunctionToolsExecutedEvent
 
 from agent.voice_agent import OmniraReceptionist, create_agent_session
@@ -131,6 +132,49 @@ async def entrypoint(ctx):
 
     logger.info(f"Agent started in room {ctx.room.name}")
 
+    # Start call recording via LiveKit Egress (audio-only S3 upload)
+    egress_id = None
+    try:
+        lk_url = os.getenv("LIVEKIT_URL", "").replace("wss://", "https://")
+        lk_api = api.LiveKitAPI(
+            url=lk_url,
+            api_key=os.getenv("LIVEKIT_API_KEY", ""),
+            api_secret=os.getenv("LIVEKIT_API_SECRET", ""),
+        )
+
+        recording_key = f"recordings/{practice_config.practice_id}/{call_id}.ogg"
+        s3_bucket = os.getenv("RECORDING_S3_BUCKET", "")
+        s3_region = os.getenv("RECORDING_S3_REGION", "us-east-1")
+
+        if s3_bucket:
+            from livekit.api import RoomCompositeEgressRequest, EncodedFileOutput, EncodedFileType, S3Upload
+
+            egress_req = RoomCompositeEgressRequest(
+                room_name=ctx.room.name,
+                audio_only=True,
+                file_outputs=[
+                    EncodedFileOutput(
+                        file_type=EncodedFileType.OGG,
+                        filepath=recording_key,
+                        s3=S3Upload(
+                            bucket=s3_bucket,
+                            region=s3_region,
+                            access_key=os.getenv("RECORDING_S3_ACCESS_KEY", ""),
+                            secret=os.getenv("RECORDING_S3_SECRET_KEY", ""),
+                        ),
+                    ),
+                ],
+            )
+            egress_resp = await lk_api.egress.start_room_composite_egress(egress_req)
+            egress_id = egress_resp.egress_id
+            recording_url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{recording_key}"
+            call_logger.set_recording_url(recording_url)
+            logger.info(f"[{call_id}] Recording started: egress_id={egress_id}")
+        else:
+            logger.info(f"[{call_id}] No RECORDING_S3_BUCKET configured — skipping recording")
+    except Exception as e:
+        logger.warning(f"[{call_id}] Recording start failed (non-fatal): {e}")
+
     disconnect_event = asyncio.Event()
 
     def on_participant_disconnected(p: rtc.RemoteParticipant):
@@ -146,6 +190,14 @@ async def entrypoint(ctx):
     ctx.room.on("disconnected", on_room_disconnected)
 
     await disconnect_event.wait()
+
+    # Stop recording if active
+    if egress_id:
+        try:
+            await lk_api.egress.stop_egress(egress_id)
+            logger.info(f"[{call_id}] Recording stopped")
+        except Exception as e:
+            logger.warning(f"[{call_id}] Recording stop failed: {e}")
 
     call_logger.log_call_end(reason="caller_disconnected")
     logger.info(f"Call {call_id} ended — sending data to Omnira")

@@ -19,13 +19,23 @@ logger = logging.getLogger("omnira-agent")
 
 VOICE_OPTIONS = {
     "deepgram": {
-        "thalia": {"provider": "deepgram", "model": "aura-2-thalia-en", "label": "Thalia (Natural Female)"},
-        "luna": {"provider": "deepgram", "model": "aura-2-luna-en", "label": "Luna (Warm Female)"},
+        "thalia": {"provider": "deepgram", "model": "aura-2-thalia-en", "label": "Thalia"},
+        "luna": {"provider": "deepgram", "model": "aura-2-luna-en", "label": "Luna"},
+        "asteria": {"provider": "deepgram", "model": "aura-2-asteria-en", "label": "Asteria"},
     },
     "elevenlabs": {
-        "aria": {"provider": "elevenlabs", "voice_id": "9BWtsMINqrJLrRacOk9x", "label": "Aria (Professional Female)"},
-        "sarah": {"provider": "elevenlabs", "voice_id": "EXAVITQu4vr4xnSDxMaL", "label": "Sarah (Friendly Female)"},
-        "charlotte": {"provider": "elevenlabs", "voice_id": "XB0fDUnXU5powFXDhCwa", "label": "Charlotte (Elegant Female)"},
+        "melissa": {"provider": "elevenlabs", "voice_id": "qgmxQ9pDWmPoMdev9PYB", "label": "Melissa"},
+        "ava": {"provider": "elevenlabs", "voice_id": "GPcYs7Mjrv07kZEzMxQE", "label": "Ava"},
+        "mark": {"provider": "elevenlabs", "voice_id": "UgBBYS2sOqTuMpoF3BR0", "label": "Mark"},
+        "gracie": {"provider": "elevenlabs", "voice_id": "T7eLpgAAhoXHlrNajG8v", "label": "Gracie"},
+        "abigail": {"provider": "elevenlabs", "voice_id": "3UFZ7Pkyx3hNTropzBlS", "label": "Abigail"},
+        "joey": {"provider": "elevenlabs", "voice_id": "h2I5OFX58E5TL5AitYwR", "label": "Joey"},
+        "barry": {"provider": "elevenlabs", "voice_id": "iTdwTswTQ3jxfWoMVywX", "label": "Barry"},
+        "belle": {"provider": "elevenlabs", "voice_id": "wewocdDkjSLm9ZwjO7TD", "label": "Belle"},
+        "juliet": {"provider": "elevenlabs", "voice_id": "WyFXw4PzMbRnp8iLMJwY", "label": "Juliet"},
+        "veda": {"provider": "elevenlabs", "voice_id": "625jGFaa0zTLtQfxwc6Q", "label": "Veda"},
+        "liz": {"provider": "elevenlabs", "voice_id": "uMM5TEnpKKgD758knVJO", "label": "Liz"},
+        "maya": {"provider": "elevenlabs", "voice_id": "tJ2B69tloiOhZn8Gk9Lp", "label": "Maya"},
     },
 }
 
@@ -59,7 +69,7 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
         from livekit.plugins import elevenlabs
         resolved_voice_id = voice_id
         if not resolved_voice_id:
-            resolved_voice_id = VOICE_OPTIONS["elevenlabs"]["aria"]["voice_id"]
+            resolved_voice_id = VOICE_OPTIONS["elevenlabs"]["abigail"]["voice_id"]
         tts = elevenlabs.TTS(
             api_key=Config.ELEVENLABS_API_KEY,
             voice_id=resolved_voice_id,
