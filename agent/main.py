@@ -85,6 +85,10 @@ async def entrypoint(ctx):
     practice_config = await _resolve_practice_config(participant)
     logger.info(f"Practice resolved: {practice_config.practice_name} (id={practice_config.practice_id})")
 
+    # Update global Config so tool calls use the resolved practice_id
+    if practice_config.practice_id:
+        Config.PRACTICE_ID = practice_config.practice_id
+
     sip_attrs = participant.attributes or {}
     from_number = sip_attrs.get("sip.callingNumber", sip_attrs.get("sip.from", ""))
     to_number = sip_attrs.get("sip.calledNumber", sip_attrs.get("sip.to", ""))
@@ -132,8 +136,11 @@ async def entrypoint(ctx):
 
     logger.info(f"Agent started in room {ctx.room.name}")
 
-    # Start call recording via LiveKit Egress (audio-only S3 upload)
+    # Start call recording via LiveKit Egress
     egress_id = None
+    lk_api = None
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_key = os.getenv("SUPABASE_SERVICE_KEY", "")
     try:
         lk_url = os.getenv("LIVEKIT_URL", "").replace("wss://", "https://")
         lk_api = api.LiveKitAPI(
@@ -142,13 +149,10 @@ async def entrypoint(ctx):
             api_secret=os.getenv("LIVEKIT_API_SECRET", ""),
         )
 
-        recording_key = f"recordings/{practice_config.practice_id}/{call_id}.ogg"
         s3_bucket = os.getenv("RECORDING_S3_BUCKET", "")
-        s3_region = os.getenv("RECORDING_S3_REGION", "us-east-1")
-
         if s3_bucket:
             from livekit.api import RoomCompositeEgressRequest, EncodedFileOutput, EncodedFileType, S3Upload
-
+            recording_key = f"recordings/{practice_config.practice_id}/{call_id}.ogg"
             egress_req = RoomCompositeEgressRequest(
                 room_name=ctx.room.name,
                 audio_only=True,
@@ -158,7 +162,7 @@ async def entrypoint(ctx):
                         filepath=recording_key,
                         s3=S3Upload(
                             bucket=s3_bucket,
-                            region=s3_region,
+                            region=os.getenv("RECORDING_S3_REGION", "us-east-1"),
                             access_key=os.getenv("RECORDING_S3_ACCESS_KEY", ""),
                             secret=os.getenv("RECORDING_S3_SECRET_KEY", ""),
                         ),
@@ -167,11 +171,11 @@ async def entrypoint(ctx):
             )
             egress_resp = await lk_api.egress.start_room_composite_egress(egress_req)
             egress_id = egress_resp.egress_id
-            recording_url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{recording_key}"
+            recording_url = f"https://{s3_bucket}.s3.amazonaws.com/{recording_key}"
             call_logger.set_recording_url(recording_url)
-            logger.info(f"[{call_id}] Recording started: egress_id={egress_id}")
+            logger.info(f"[{call_id}] Recording started (S3): egress_id={egress_id}")
         else:
-            logger.info(f"[{call_id}] No RECORDING_S3_BUCKET configured — skipping recording")
+            logger.info(f"[{call_id}] No RECORDING_S3_BUCKET — will upload to Supabase after call")
     except Exception as e:
         logger.warning(f"[{call_id}] Recording start failed (non-fatal): {e}")
 
@@ -192,7 +196,7 @@ async def entrypoint(ctx):
     await disconnect_event.wait()
 
     # Stop recording if active
-    if egress_id:
+    if egress_id and lk_api:
         try:
             await lk_api.egress.stop_egress(egress_id)
             logger.info(f"[{call_id}] Recording stopped")
