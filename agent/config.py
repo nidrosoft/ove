@@ -34,24 +34,24 @@ class Config:
 
     # Fallback practice config (used when API config fetch fails)
     PRACTICE_ID = os.getenv("PRACTICE_ID", "")
-    PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Rivera Dental Care")
-    PRACTICE_PHONE = os.getenv("PRACTICE_PHONE", "(555) 867-5309")
-    PRACTICE_TIMEZONE = os.getenv("PRACTICE_TIMEZONE", "America/Chicago")
-    PRACTICE_HOURS = os.getenv("PRACTICE_HOURS", "Mon-Fri 8am-5pm, Sat 9am-1pm")
-    PRACTICE_ADDRESS = os.getenv("PRACTICE_ADDRESS", "742 Evergreen Terrace, Austin, TX 78701")
+    PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Dental Practice")
+    PRACTICE_PHONE = os.getenv("PRACTICE_PHONE", "")
+    PRACTICE_TIMEZONE = os.getenv("PRACTICE_TIMEZONE", "America/New_York")
+    PRACTICE_HOURS = os.getenv("PRACTICE_HOURS", "Mon-Fri 8am-5pm")
+    PRACTICE_ADDRESS = os.getenv("PRACTICE_ADDRESS", "")
     AGENT_NAME = os.getenv("AGENT_NAME", "Relay")
-    TTS_PROVIDER = os.getenv("TTS_PROVIDER", "deepgram")
+    TTS_PROVIDER = os.getenv("TTS_PROVIDER", "elevenlabs")
 
 
 @dataclass
 class PracticeConfig:
     """Per-practice configuration loaded dynamically per call."""
     practice_id: str = ""
-    practice_name: str = "Rivera Dental Care"
-    practice_phone: str = "(555) 867-5309"
-    practice_timezone: str = "America/Chicago"
+    practice_name: str = "Dental Practice"
+    practice_phone: str = ""
+    practice_timezone: str = "America/New_York"
     practice_hours: str = "Mon-Fri 8am-5pm"
-    practice_address: str = "742 Evergreen Terrace, Austin, TX 78701"
+    practice_address: str = ""
     agent_name: str = "Relay"
     tts_provider: str = "deepgram"
     tts_voice_id: str = ""

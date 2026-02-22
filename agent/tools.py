@@ -204,17 +204,15 @@ async def send_email(
     return "I wasn't able to send the email right now, but your appointment is confirmed."
 
 
-@function_tool(description="Transfer the call to a human staff member. Use when the caller needs something you cannot handle.")
-async def transfer_call(
+@function_tool(description="End the phone call gracefully. Call this AFTER you've said goodbye and the conversation is complete.")
+async def end_call(
     context: RunContext,
-    reason: str,
-    department: str = "front_desk",
+    reason: str = "conversation_complete",
 ) -> str:
-    """Transfer the current call to human staff.
+    """End the current phone call. Call this after saying your farewell.
 
     Args:
-        reason: Brief reason for the transfer
-        department: Which department to transfer to (front_desk, billing, clinical)
+        reason: Brief reason for ending the call (e.g., conversation_complete, caller_request)
     """
-    logger.info(f"Call transfer requested: {reason} → {department}")
-    return f"I'm transferring you now to our {department.replace('_', ' ')} team. One moment please."
+    logger.info(f"Call ending: {reason}")
+    return "__END_CALL__"

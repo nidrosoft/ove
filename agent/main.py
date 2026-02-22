@@ -2,11 +2,10 @@
 import asyncio
 import json
 import logging
-import os
 import uuid
 
 from dotenv import load_dotenv
-from livekit import rtc, api
+from livekit import rtc
 from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent, FunctionToolsExecutedEvent
 
 from agent.voice_agent import OmniraReceptionist, create_agent_session
@@ -23,16 +22,26 @@ logger = logging.getLogger("omnira")
 logger.info(f"Worker started | Default practice: {Config.PRACTICE_NAME} | Agent: {Config.AGENT_NAME}")
 
 
-async def _resolve_practice_config(participant) -> PracticeConfig:
-    """Resolve practice config from SIP participant attributes or room metadata."""
+async def _resolve_practice_config(participant, room_name: str = "") -> PracticeConfig:
+    """Resolve practice config from SIP participant attributes, room name, or env."""
     attrs = participant.attributes or {}
 
-    # LiveKit dispatch rules can pass practice_id via room metadata or participant attributes
     practice_id = (
         attrs.get("practice_id")
         or attrs.get("sip.practice_id")
         or ""
     )
+
+    # Extract practice_id from room name (format: "call-{practice_id}_+1XXXXXXXXXX_random")
+    if not practice_id and room_name and room_name.startswith("call-"):
+        parts = room_name.replace("call-", "", 1).split("_")
+        if parts and len(parts[0]) > 8:
+            practice_id = parts[0]
+            logger.info(f"Extracted practice_id from room name: {practice_id}")
+
+    # Use env PRACTICE_ID as ultimate fallback for single-tenant setup
+    if not practice_id:
+        practice_id = Config.PRACTICE_ID
 
     if practice_id:
         logger.info(f"Fetching config for practice_id={practice_id}")
@@ -72,6 +81,15 @@ async def _resolve_practice_config(participant) -> PracticeConfig:
     return PracticeConfig.from_env()
 
 
+async def _disconnect_room(ctx, call_id: str):
+    """Disconnect from the room to end the call."""
+    try:
+        logger.info(f"[{call_id}] Disconnecting room to end call")
+        await ctx.room.disconnect()
+    except Exception as e:
+        logger.warning(f"[{call_id}] Room disconnect error: {e}")
+
+
 async def entrypoint(ctx):
     """Handle a new call/room connection."""
     logger.info(f"New connection: room={ctx.room.name}")
@@ -82,7 +100,7 @@ async def entrypoint(ctx):
     logger.info(f"Participant joined: {participant.identity}")
 
     # Resolve practice config dynamically
-    practice_config = await _resolve_practice_config(participant)
+    practice_config = await _resolve_practice_config(participant, room_name=ctx.room.name)
     logger.info(f"Practice resolved: {practice_config.practice_name} (id={practice_config.practice_id})")
 
     # Update global Config so tool calls use the resolved practice_id
@@ -90,8 +108,26 @@ async def entrypoint(ctx):
         Config.PRACTICE_ID = practice_config.practice_id
 
     sip_attrs = participant.attributes or {}
-    from_number = sip_attrs.get("sip.callingNumber", sip_attrs.get("sip.from", ""))
-    to_number = sip_attrs.get("sip.calledNumber", sip_attrs.get("sip.to", ""))
+    logger.info(f"SIP participant attributes: {sip_attrs}")
+    logger.info(f"Participant identity: {participant.identity}, kind: {participant.kind}")
+
+    # Extract caller number from SIP attributes or participant identity
+    from_number = (
+        sip_attrs.get("sip.callingNumber", "")
+        or sip_attrs.get("sip.phoneNumber", "")
+        or sip_attrs.get("sip.from", "")
+    )
+
+    # Fallback: parse phone number from participant identity (e.g. "sip_+16197717069")
+    if not from_number and participant.identity and participant.identity.startswith("sip_"):
+        from_number = participant.identity.replace("sip_", "")
+
+    # Extract called number from SIP attributes or use practice phone
+    to_number = (
+        sip_attrs.get("sip.calledNumber", "")
+        or sip_attrs.get("sip.to", "")
+        or practice_config.practice_phone
+    )
 
     call_id = str(uuid.uuid4())
     call_logger = CallLogger(
@@ -127,6 +163,10 @@ async def entrypoint(ctx):
             call_logger.log_tool_call(tool_name, args, result_str)
             logger.info(f"[{call_id}] Tool: {tool_name}({json.dumps(args)[:100]}) → {result_str[:100]}")
 
+            if tool_name == "end_call" and "__END_CALL__" in result_str:
+                logger.info(f"[{call_id}] Agent requested call end — disconnecting in 2s")
+                asyncio.get_event_loop().call_later(2.0, lambda: asyncio.ensure_future(_disconnect_room(ctx, call_id)))
+
     agent = OmniraReceptionist(call_logger=call_logger, practice_config=practice_config)
 
     await session.start(
@@ -135,49 +175,6 @@ async def entrypoint(ctx):
     )
 
     logger.info(f"Agent started in room {ctx.room.name}")
-
-    # Start call recording via LiveKit Egress
-    egress_id = None
-    lk_api = None
-    supabase_url = os.getenv("SUPABASE_URL", "")
-    supabase_key = os.getenv("SUPABASE_SERVICE_KEY", "")
-    try:
-        lk_url = os.getenv("LIVEKIT_URL", "").replace("wss://", "https://")
-        lk_api = api.LiveKitAPI(
-            url=lk_url,
-            api_key=os.getenv("LIVEKIT_API_KEY", ""),
-            api_secret=os.getenv("LIVEKIT_API_SECRET", ""),
-        )
-
-        s3_bucket = os.getenv("RECORDING_S3_BUCKET", "")
-        if s3_bucket:
-            from livekit.api import RoomCompositeEgressRequest, EncodedFileOutput, EncodedFileType, S3Upload
-            recording_key = f"recordings/{practice_config.practice_id}/{call_id}.ogg"
-            egress_req = RoomCompositeEgressRequest(
-                room_name=ctx.room.name,
-                audio_only=True,
-                file_outputs=[
-                    EncodedFileOutput(
-                        file_type=EncodedFileType.OGG,
-                        filepath=recording_key,
-                        s3=S3Upload(
-                            bucket=s3_bucket,
-                            region=os.getenv("RECORDING_S3_REGION", "us-east-1"),
-                            access_key=os.getenv("RECORDING_S3_ACCESS_KEY", ""),
-                            secret=os.getenv("RECORDING_S3_SECRET_KEY", ""),
-                        ),
-                    ),
-                ],
-            )
-            egress_resp = await lk_api.egress.start_room_composite_egress(egress_req)
-            egress_id = egress_resp.egress_id
-            recording_url = f"https://{s3_bucket}.s3.amazonaws.com/{recording_key}"
-            call_logger.set_recording_url(recording_url)
-            logger.info(f"[{call_id}] Recording started (S3): egress_id={egress_id}")
-        else:
-            logger.info(f"[{call_id}] No RECORDING_S3_BUCKET — will upload to Supabase after call")
-    except Exception as e:
-        logger.warning(f"[{call_id}] Recording start failed (non-fatal): {e}")
 
     disconnect_event = asyncio.Event()
 
@@ -194,14 +191,6 @@ async def entrypoint(ctx):
     ctx.room.on("disconnected", on_room_disconnected)
 
     await disconnect_event.wait()
-
-    # Stop recording if active
-    if egress_id and lk_api:
-        try:
-            await lk_api.egress.stop_egress(egress_id)
-            logger.info(f"[{call_id}] Recording stopped")
-        except Exception as e:
-            logger.warning(f"[{call_id}] Recording stop failed: {e}")
 
     call_logger.log_call_end(reason="caller_disconnected")
     logger.info(f"Call {call_id} ended — sending data to Omnira")

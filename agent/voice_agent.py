@@ -12,6 +12,7 @@ from agent.tools import (
     send_sms,
     send_email,
     lookup_patient,
+    end_call,
 )
 from agent.logger import CallLogger
 
@@ -104,6 +105,7 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
             book_appointment,
             send_sms,
             send_email,
+            end_call,
         ],
     )
 
