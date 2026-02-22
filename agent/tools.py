@@ -204,6 +204,39 @@ async def send_email(
     return "I wasn't able to send the email right now, but your appointment is confirmed."
 
 
+@function_tool(description="Log a message for staff follow-up. Use this when you can't resolve something directly and need a team member to handle it.")
+async def log_message(
+    context: RunContext,
+    message: str,
+    category: str = "general",
+    urgency: str = "normal",
+    callback_number: str = "",
+    callback_name: str = "",
+) -> str:
+    """Log a message for staff follow-up.
+
+    Args:
+        message: The message to log for staff (what the caller needs)
+        category: Category of the message (billing, clinical, scheduling, general, provider_callback)
+        urgency: How urgent this is (normal, high, low)
+        callback_number: Phone number to call back (if provided)
+        callback_name: Name of person to call back (if provided)
+    """
+    logger.info(f"Logging message: category={category}, urgency={urgency}, message={message[:100]}")
+
+    result = await _call_omnira_action("log_message", {
+        "message": message,
+        "category": category,
+        "urgency": urgency,
+        "callback_number": callback_number,
+        "callback_name": callback_name,
+    })
+
+    if result.get("success"):
+        return "Got it, I've logged that for the team. Someone will follow up."
+    return "I've made a note of that. Someone from our team will follow up with you."
+
+
 @function_tool(description="End the phone call gracefully. Call this AFTER you've said goodbye and the conversation is complete.")
 async def end_call(
     context: RunContext,

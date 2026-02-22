@@ -1,6 +1,5 @@
 """Environment-based configuration loader."""
 import os
-import json
 import logging
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
@@ -52,11 +51,15 @@ class PracticeConfig:
     practice_timezone: str = "America/New_York"
     practice_hours: str = "Mon-Fri 8am-5pm"
     practice_address: str = ""
+    practice_website: str = ""
+    emergency_info: str = ""
     agent_name: str = "Relay"
     tts_provider: str = "deepgram"
     tts_voice_id: str = ""
     knowledge_base: str = ""
     operating_hours: list = field(default_factory=list)
+    providers: list = field(default_factory=list)
+    services: list = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> "PracticeConfig":
@@ -94,11 +97,15 @@ class PracticeConfig:
                         practice_timezone=data.get("practice_timezone", Config.PRACTICE_TIMEZONE),
                         practice_hours=data.get("practice_hours", Config.PRACTICE_HOURS),
                         practice_address=data.get("practice_address", Config.PRACTICE_ADDRESS),
+                        practice_website=data.get("practice_website", ""),
+                        emergency_info=data.get("emergency_info", ""),
                         agent_name=data.get("agent_name", Config.AGENT_NAME),
                         tts_provider=data.get("tts_provider", Config.TTS_PROVIDER),
                         tts_voice_id=data.get("tts_voice_id", ""),
                         knowledge_base=data.get("knowledge_base", ""),
                         operating_hours=data.get("operating_hours", []),
+                        providers=data.get("providers", []),
+                        services=data.get("services", []),
                     )
                 else:
                     logger.warning(f"Failed to fetch config for {practice_id}: {resp.status_code}")
