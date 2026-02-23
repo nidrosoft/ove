@@ -202,16 +202,12 @@ async def entrypoint(ctx):
 
     call_logger.log_call_end(reason="caller_disconnected")
 
-    # Wait for recording to finish and attach URL
+    # Send post-call data FIRST (before waiting for recording — process may exit)
+    # If recording is available, we'll set a preliminary URL optimistically
     if egress_id:
-        logger.info(f"[{call_id}] Waiting for recording egress to complete...")
-        recording_ok = await wait_for_egress(egress_id, timeout=60.0)
-        if recording_ok:
-            recording_url = get_recording_url(call_id)
-            call_logger.set_recording_url(recording_url)
-            logger.info(f"[{call_id}] Recording URL: {recording_url}")
-        else:
-            logger.warning(f"[{call_id}] Recording egress did not complete successfully")
+        recording_url = get_recording_url(call_id)
+        call_logger.set_recording_url(recording_url)
+        logger.info(f"[{call_id}] Recording URL (optimistic): {recording_url}")
 
     logger.info(f"Call {call_id} ended — sending data to Omnira")
     await call_logger.send_to_omnira()
