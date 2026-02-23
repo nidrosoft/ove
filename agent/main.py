@@ -11,6 +11,7 @@ from livekit.agents import WorkerOptions, cli, ConversationItemAddedEvent, Funct
 from agent.voice_agent import OmniraReceptionist, create_agent_session
 from agent.logger import CallLogger
 from agent.config import Config, PracticeConfig
+from agent.recording import start_room_recording, get_recording_url, wait_for_egress
 
 load_dotenv()
 
@@ -176,6 +177,13 @@ async def entrypoint(ctx):
 
     logger.info(f"Agent started in room {ctx.room.name}")
 
+    # Start recording via LiveKit Egress
+    egress_id = await start_room_recording(ctx.room.name, call_id)
+    if egress_id:
+        logger.info(f"[{call_id}] Recording egress started: {egress_id}")
+    else:
+        logger.info(f"[{call_id}] Recording not available (S3 creds not configured)")
+
     disconnect_event = asyncio.Event()
 
     def on_participant_disconnected(p: rtc.RemoteParticipant):
@@ -193,6 +201,18 @@ async def entrypoint(ctx):
     await disconnect_event.wait()
 
     call_logger.log_call_end(reason="caller_disconnected")
+
+    # Wait for recording to finish and attach URL
+    if egress_id:
+        logger.info(f"[{call_id}] Waiting for recording egress to complete...")
+        recording_ok = await wait_for_egress(egress_id, timeout=60.0)
+        if recording_ok:
+            recording_url = get_recording_url(call_id)
+            call_logger.set_recording_url(recording_url)
+            logger.info(f"[{call_id}] Recording URL: {recording_url}")
+        else:
+            logger.warning(f"[{call_id}] Recording egress did not complete successfully")
+
     logger.info(f"Call {call_id} ended — sending data to Omnira")
     await call_logger.send_to_omnira()
     logger.info(f"Call {call_id} — post-call data sent")

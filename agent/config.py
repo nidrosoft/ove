@@ -31,6 +31,10 @@ class Config:
     OMNIRA_API_URL = os.getenv("OMNIRA_API_URL", "https://omniradental-cyri.vercel.app/api")
     OMNIRA_API_KEY = os.getenv("OMNIRA_API_KEY", "")
 
+    # Supabase Storage (for call recordings)
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
     # Fallback practice config (used when API config fetch fails)
     PRACTICE_ID = os.getenv("PRACTICE_ID", "")
     PRACTICE_NAME = os.getenv("PRACTICE_NAME", "Dental Practice")
