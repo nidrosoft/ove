@@ -2,7 +2,7 @@
 import logging
 
 from livekit.agents import Agent, AgentSession
-from livekit.plugins import deepgram, silero, anthropic
+from livekit.plugins import deepgram, silero, anthropic, openai
 
 from agent.config import Config, PracticeConfig
 from agent.prompts import build_system_prompt
@@ -88,6 +88,23 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
         )
         logger.info(f"Using Deepgram TTS: model={model}")
 
+    # Select LLM based on provider config
+    llm_provider = Config.LLM_PROVIDER.lower()
+    if llm_provider == "mercury" and Config.INCEPTION_API_KEY:
+        llm = openai.LLM(
+            model="mercury-2",
+            api_key=Config.INCEPTION_API_KEY,
+            base_url=Config.INCEPTION_BASE_URL,
+            temperature=0.7,
+        )
+        logger.info("Using Mercury 2 LLM (Inception Labs)")
+    else:
+        llm = anthropic.LLM(
+            api_key=Config.ANTHROPIC_API_KEY,
+            model="claude-haiku-4-5-20251001",
+        )
+        logger.info("Using Claude Haiku 4.5 LLM (Anthropic)")
+
     session = AgentSession(
         vad=silero.VAD.load(),
         stt=deepgram.STT(
@@ -95,10 +112,7 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
             model="nova-2",
             language="en",
         ),
-        llm=anthropic.LLM(
-            api_key=Config.ANTHROPIC_API_KEY,
-            model="claude-haiku-4-5-20251001",
-        ),
+        llm=llm,
         tts=tts,
         tools=[
             lookup_patient,

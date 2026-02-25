@@ -21,6 +21,13 @@ class Config:
     DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
+    # Mercury 2 (Inception Labs) — OpenAI-compatible
+    INCEPTION_API_KEY = os.getenv("INCEPTION_API_KEY", "")
+    INCEPTION_BASE_URL = os.getenv("INCEPTION_BASE_URL", "https://api.inceptionlabs.ai/v1")
+
+    # LLM provider: "anthropic" (Claude Haiku) or "mercury" (Mercury 2)
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
+
     TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
