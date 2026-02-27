@@ -88,22 +88,19 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
         )
         logger.info(f"Using Deepgram TTS: model={model}")
 
-    # Select LLM based on provider config
-    llm_provider = Config.LLM_PROVIDER.lower()
-    if llm_provider == "mercury" and Config.INCEPTION_API_KEY:
+    if Config.LLM_PROVIDER == "mercury" and Config.INCEPTION_API_KEY:
         llm = openai.LLM(
-            model="mercury-2",
             api_key=Config.INCEPTION_API_KEY,
             base_url=Config.INCEPTION_BASE_URL,
-            temperature=0.7,
+            model="mercury-2",
         )
-        logger.info("Using Mercury 2 LLM (Inception Labs)")
+        logger.info("Using Mercury 2 LLM (Inception AI)")
     else:
         llm = anthropic.LLM(
             api_key=Config.ANTHROPIC_API_KEY,
             model="claude-haiku-4-5-20251001",
         )
-        logger.info("Using Claude Haiku 4.5 LLM (Anthropic)")
+        logger.info("Using Claude Haiku LLM (Anthropic)")
 
     session = AgentSession(
         vad=silero.VAD.load(),

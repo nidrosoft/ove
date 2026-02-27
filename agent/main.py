@@ -154,9 +154,6 @@ async def entrypoint(ctx):
     )
     logger.info(f"Call {call_id}: from={from_number} to={to_number} practice={practice_config.practice_id}")
 
-    post_call_sent = asyncio.Event()
-    egress_id = None
-
     session = create_agent_session(practice_config)
 
     @session.on("conversation_item_added")
@@ -183,13 +180,8 @@ async def entrypoint(ctx):
             logger.info(f"[{call_id}] Tool: {tool_name}({json.dumps(args)[:100]}) → {result_str[:100]}")
 
             if tool_name == "end_call" and "__END_CALL__" in result_str:
-                logger.info(f"[{call_id}] Agent requested call end — sending post-call data then disconnecting in 2s")
-                asyncio.get_event_loop().call_later(
-                    2.0,
-                    lambda: asyncio.ensure_future(
-                        _send_post_call_and_disconnect(ctx, call_id, call_logger, egress_id, post_call_sent)
-                    ),
-                )
+                logger.info(f"[{call_id}] Agent requested call end — disconnecting in 2s")
+                asyncio.get_event_loop().call_later(2.0, lambda: asyncio.ensure_future(_disconnect_room(ctx, call_id)))
 
     agent = OmniraReceptionist(call_logger=call_logger, practice_config=practice_config)
 
@@ -223,19 +215,18 @@ async def entrypoint(ctx):
 
     await disconnect_event.wait()
 
-    # Send post-call data if not already sent by the end_call handler
-    if not post_call_sent.is_set():
-        post_call_sent.set()
-        call_logger.log_call_end(reason="caller_disconnected")
-        if egress_id:
-            recording_url = get_recording_url(call_id)
-            call_logger.set_recording_url(recording_url)
-            logger.info(f"[{call_id}] Recording URL (optimistic): {recording_url}")
-        logger.info(f"Call {call_id} ended — sending data to Omnira")
-        await call_logger.send_to_omnira()
-        logger.info(f"Call {call_id} — post-call data sent")
-    else:
-        logger.info(f"Call {call_id} — post-call data already sent by end_call handler")
+    call_logger.log_call_end(reason="caller_disconnected")
+
+    # Send post-call data FIRST (before waiting for recording — process may exit)
+    # If recording is available, we'll set a preliminary URL optimistically
+    if egress_id:
+        recording_url = get_recording_url(call_id)
+        call_logger.set_recording_url(recording_url)
+        logger.info(f"[{call_id}] Recording URL (optimistic): {recording_url}")
+
+    logger.info(f"Call {call_id} ended — sending data to Omnira")
+    await call_logger.send_to_omnira()
+    logger.info(f"Call {call_id} — post-call data sent")
 
 
 if __name__ == "__main__":
