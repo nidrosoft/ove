@@ -88,19 +88,34 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
         )
         logger.info(f"Using Deepgram TTS: model={model}")
 
+    # ── LLM with fallback: Mercury 2 (primary) → Claude Sonnet (fallback) ──
+    # LiveKit's FallbackAdapter automatically switches if the primary fails
+    # (timeout, overload, rate limit, etc.). The user never hears the swap.
+    from livekit.agents.llm import FallbackAdapter
+
+    sonnet_llm = anthropic.LLM(
+        api_key=Config.ANTHROPIC_API_KEY,
+        model="claude-sonnet-4-5-20250929",
+    )
+
     if Config.LLM_PROVIDER == "mercury" and Config.INCEPTION_API_KEY:
-        llm = openai.LLM(
+        mercury_llm = openai.LLM(
             api_key=Config.INCEPTION_API_KEY,
             base_url=Config.INCEPTION_BASE_URL,
             model="mercury-2",
         )
-        logger.info("Using Mercury 2 LLM (Inception AI)")
+        llm = FallbackAdapter([mercury_llm, sonnet_llm])
+        logger.info("Using Mercury 2 LLM (primary) with Claude Sonnet 4.5 fallback")
+    elif Config.LLM_PROVIDER == "anthropic":
+        llm = sonnet_llm
+        logger.info("Using Claude Sonnet 4.5 LLM (Anthropic)")
     else:
+        # Legacy/default behavior — keep Haiku for backward compatibility
         llm = anthropic.LLM(
             api_key=Config.ANTHROPIC_API_KEY,
             model="claude-haiku-4-5-20251001",
         )
-        logger.info("Using Claude Haiku LLM (Anthropic)")
+        logger.info("Using Claude Haiku LLM (Anthropic) — legacy default")
 
     session = AgentSession(
         vad=silero.VAD.load(),
