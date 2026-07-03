@@ -14,7 +14,15 @@ from agent.tools import (
     lookup_patient,
     log_message,
     end_call,
+    verify_caller,
+    send_verification_code,
+    confirm_verification_code,
+    get_my_appointments,
+    get_account_snapshot,
+    check_benefits,
+    estimate_copay,
 )
+from agent.call_context import current_call
 from agent.logger import CallLogger
 
 logger = logging.getLogger("omnira-agent")
@@ -56,10 +64,25 @@ class OmniraReceptionist(Agent):
         logger.info(f"Agent created: practice={practice_config.practice_name} agent={practice_config.agent_name}")
 
     async def on_enter(self):
-        self.session.generate_reply(
-            instructions="Greet the caller warmly. Say: Thank you for calling "
-            f"{self.practice_config.practice_name}, this is {self.practice_config.agent_name}, how can I help you today?"
-        )
+        if current_call.recognized_first_name:
+            continuity = (
+                f" They called recently about: {current_call.recent_call_topic}. If natural, offer to pick that back up."
+                if current_call.recent_call_topic
+                else ""
+            )
+            self.session.generate_reply(
+                instructions=(
+                    f"Greet the caller warmly: Thank you for calling {self.practice_config.practice_name}, "
+                    f"this is {self.practice_config.agent_name} — am I speaking with {current_call.recognized_first_name}? "
+                    "(Their number matches a patient on file — CONFIRM, never assume; if it's someone else, proceed normally.)"
+                    + continuity
+                )
+            )
+        else:
+            self.session.generate_reply(
+                instructions="Greet the caller warmly. Say: Thank you for calling "
+                f"{self.practice_config.practice_name}, this is {self.practice_config.agent_name}, how can I help you today?"
+            )
 
 
 def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
@@ -134,6 +157,13 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
             send_email,
             log_message,
             end_call,
+            verify_caller,
+            send_verification_code,
+            confirm_verification_code,
+            get_my_appointments,
+            get_account_snapshot,
+            check_benefits,
+            estimate_copay,
         ],
     )
 

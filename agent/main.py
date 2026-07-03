@@ -154,6 +154,38 @@ async def entrypoint(ctx):
     )
     logger.info(f"Call {call_id}: from={from_number} to={to_number} practice={practice_config.practice_id}")
 
+    # Per-call context for the tool layer (spec 59): the call_session_id rides
+    # on every platform action so verification is enforced server-side.
+    from agent.call_context import current_call
+    current_call.reset()
+    current_call.call_id = call_id
+    current_call.practice_id = practice_config.practice_id
+    current_call.caller_number = from_number
+
+    # Register the verification session + caller-ID recognition BEFORE the
+    # greeting so the agent can personalize ("Am I speaking with Sarah?").
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            resp = await client.post(
+                f"{Config.OMNIRA_API_URL}/voice-engine/actions",
+                json={
+                    "action": "start_call_session",
+                    "practice_id": practice_config.practice_id,
+                    "params": {"call_id": call_id, "caller_number": from_number},
+                },
+                headers={"Authorization": f"Bearer {Config.OMNIRA_API_KEY}"},
+            )
+            if resp.status_code < 400:
+                data = resp.json()
+                if data.get("recognized"):
+                    current_call.recognized_first_name = data.get("greeting_name", "") or ""
+                    recent = data.get("recent_call") or {}
+                    current_call.recent_call_topic = (recent.get("topic") or "") if isinstance(recent, dict) else ""
+                    logger.info(f"[{call_id}] Caller recognized: {current_call.recognized_first_name}")
+    except Exception as e:
+        logger.warning(f"[{call_id}] start_call_session failed (continuing anonymous): {e}")
+
     session = create_agent_session(practice_config)
 
     @session.on("conversation_item_added")
