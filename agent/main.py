@@ -172,7 +172,7 @@ async def entrypoint(ctx):
                 json={
                     "action": "start_call_session",
                     "practice_id": practice_config.practice_id,
-                    "params": {"call_id": call_id, "caller_number": from_number},
+                    "params": {"call_id": call_id, "caller_number": from_number, "called_number": to_number},
                 },
                 headers={"Authorization": f"Bearer {Config.OMNIRA_API_KEY}"},
             )

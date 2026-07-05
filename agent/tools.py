@@ -114,7 +114,10 @@ async def check_availability(
     })
 
 
-@function_tool(description="Book an appointment for a patient. Use this after confirming details with the caller.")
+@function_tool(description=(
+    "Book an appointment for a patient. Use this after confirming details with the caller. "
+    "ALWAYS pass the provider_id from the availability slot the caller chose."
+))
 async def book_appointment(
     context: RunContext,
     patient_name: str,
@@ -124,6 +127,7 @@ async def book_appointment(
     patient_phone: str = "",
     patient_email: str = "",
     is_new_patient: bool = True,
+    provider_id: str = "",
 ) -> str:
     """Book an appointment via the Omnira platform.
 
@@ -135,8 +139,9 @@ async def book_appointment(
         patient_phone: Patient phone number (optional)
         patient_email: Patient email address (optional)
         is_new_patient: Whether this is a new patient (default True)
+        provider_id: The provider_id from the chosen availability slot (strongly recommended)
     """
-    logger.info(f"Booking: {patient_name} on {date} at {time} for {procedure_type}")
+    logger.info(f"Booking: {patient_name} on {date} at {time} for {procedure_type} (provider={provider_id or 'auto'})")
 
     result = await _call_omnira_action("book_appointment", {
         "patient_name": patient_name,
@@ -146,6 +151,7 @@ async def book_appointment(
         "phone": patient_phone,
         "email": patient_email,
         "is_new_patient": is_new_patient,
+        "provider_id": provider_id,
     })
 
     if result.get("success"):
@@ -186,12 +192,16 @@ async def send_sms(
     return "I wasn't able to send the text right now, but I've noted the appointment details."
 
 
-@function_tool(description="Send a confirmation email to the patient. Use after booking an appointment.")
+@function_tool(description=(
+    "Send a confirmation email to the patient. Use after booking an appointment. "
+    "ALWAYS pass the appointment_id returned by book_appointment so the email shows the right appointment."
+))
 async def send_email(
     context: RunContext,
     to_email: str,
     subject: str,
     body: str,
+    appointment_id: str = "",
 ) -> str:
     """Send an email via the Omnira platform.
 
@@ -199,6 +209,7 @@ async def send_email(
         to_email: Recipient email address
         subject: Email subject line
         body: Email body text (plain text)
+        appointment_id: The appointment_id from book_appointment (strongly recommended)
     """
     logger.info(f"Sending email to {to_email}: {subject}")
 
@@ -206,6 +217,7 @@ async def send_email(
         "email": to_email,
         "subject": subject,
         "body": body,
+        "appointment_id": appointment_id,
     })
 
     if result.get("success"):

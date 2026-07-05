@@ -14,6 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY . .
 
+# Build-time smoke test: a broken system prompt must fail the deploy,
+# never a live call (see scripts/test_prompt.py)
+RUN python -m scripts.test_prompt
+
 # LiveKit agents CLI entry point
 # 'start' runs in production mode (vs 'dev' for development)
 CMD ["python", "-m", "agent.main", "start"]
