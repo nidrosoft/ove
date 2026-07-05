@@ -123,7 +123,7 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
 
     sonnet_llm = anthropic.LLM(
         api_key=Config.ANTHROPIC_API_KEY,
-        model="claude-sonnet-4-5-20250929",
+        model="claude-sonnet-5",
     )
 
     if Config.LLM_PROVIDER == "mercury" and Config.INCEPTION_API_KEY:
@@ -133,15 +133,15 @@ def create_agent_session(practice_config: PracticeConfig) -> AgentSession:
             model="mercury-2",
         )
         llm = FallbackAdapter([mercury_llm, sonnet_llm])
-        logger.info("Using Mercury 2 LLM (primary) with Claude Sonnet 4.5 fallback")
+        logger.info("Using Mercury 2 LLM (primary) with Claude Sonnet 5 fallback")
     elif Config.LLM_PROVIDER == "anthropic":
         llm = sonnet_llm
-        logger.info("Using Claude Sonnet 4.5 LLM (Anthropic)")
+        logger.info("Using Claude Sonnet 5 LLM (Anthropic)")
     else:
         # Legacy/default behavior — keep Haiku for backward compatibility
         llm = anthropic.LLM(
             api_key=Config.ANTHROPIC_API_KEY,
-            model="claude-haiku-4-5-20251001",
+            model="claude-haiku-4-5",
         )
         logger.info("Using Claude Haiku LLM (Anthropic) — legacy default")
 

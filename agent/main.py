@@ -204,7 +204,10 @@ async def entrypoint(ctx):
         for fnc_call, fnc_output in event.zipped():
             tool_name = fnc_call.name
             try:
-                args = fnc_call.arguments if isinstance(fnc_call.arguments, dict) else json.loads(fnc_call.raw_arguments or "{}")
+                raw = getattr(fnc_call, "arguments", None) or getattr(fnc_call, "raw_arguments", None) or "{}"
+                args = raw if isinstance(raw, dict) else json.loads(raw)
+                if not isinstance(args, dict):
+                    args = {}
             except Exception:
                 args = {}
             result_str = str(fnc_output.output or fnc_output.content or "")[:500]
