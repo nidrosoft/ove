@@ -46,6 +46,8 @@ def main() -> int:
             try:
                 prompt = build_system_prompt(cfg, caller_info=ci)
                 assert len(prompt) > 1000, "prompt suspiciously short"
+                if ci and ci.get("phone_number"):
+                    assert ci["phone_number"] in prompt, "caller ID missing from prompt"
                 print(f"OK   config={cfg_name} caller={ci_name} len={len(prompt)}")
             except Exception as e:
                 failures += 1

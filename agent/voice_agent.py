@@ -56,8 +56,13 @@ class OmniraReceptionist(Agent):
     """The Omnira dental receptionist voice agent."""
 
     def __init__(self, call_logger: CallLogger, practice_config: PracticeConfig):
+        caller_info = (
+            {"phone_number": current_call.caller_number}
+            if current_call.caller_number
+            else None
+        )
         super().__init__(
-            instructions=build_system_prompt(practice_config),
+            instructions=build_system_prompt(practice_config, caller_info),
         )
         self.call_logger = call_logger
         self.practice_config = practice_config
